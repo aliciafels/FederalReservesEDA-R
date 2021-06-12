@@ -1,0 +1,349 @@
+---
+title: "Federeal Reserve Bank of St. Louis Economic Data Report"
+subtitle: "Project 2"
+author: "Alicia Fels"
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 2
+geometry: margin = 0.5in
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+```
+
+```{r preliminaries, include = FALSE}
+library(ggplot2)
+library(dplyr)
+library(ggthemes)
+library(tidyverse)
+library(Hmisc)
+library(skimr)
+library(ggridges)
+library(scales)
+library(cowplot)
+library(gghighlight)
+fredDataDF <- read.csv("fredData.csv")
+fredDataDF$date <- as.Date(fredDataDF$date, format = "%Y-%m-%d") #have to change the date format to make R register it as the date class and not the character class
+Hmisc::describe(fredDataDF)
+```
+
+# Executive Summary
+
+The overall sample size for Federal Reserves Economics data set was 879 observations at different time points from 1948 to 2021. Data was collected on median family income, median household income, median personal income, federal minimum wage, labor force participation rate over all working-age individuals aged 16+, labor force participation rate for working age men, labor force participation rate for working age women, labor force participation rate for 16-19, 20-24, 25-54, and 55+ years old; share of the nation's net worth held by the bottom 50%, by the middle 50-90%, and held by the top 1% at each time point. 7 of the collected variables are missing observations, the proportion of numbers of missing cases/data: median family income has a 0.94 proportion, median household income has a 0.96 proportion, median personal income has a 0.95 proportion, federal minimum wage has a 0.94 proportion, all the net worth variables (bottom 50%, middle 50-90%, and top 1%) have a 0.86 proportion of missing cases. However, these variables were only first reported later than the beginning of the time period for the labor force participation rate variables and they are also reported at different intervals as well. For example, both Median Family Income and Federal Minimum Wage were first reported in January 1968 and reported once every year thereafter. Median Personal Income was first reported in January 1974 (also reported once every year afterwards) and Median Household Income was only first reported in January 1984, though all three median income variables were not reported after January 2019. Lastly, all three net worth variables were first reported in July 1989, with follow up at the beginning of every new quarter (January, April, July, and October) with the last net worth reported in October 2020. 
+
+We found:
+
+-The share of net worth of the Top 1% can most likely predict the share of the 50-90% because the two variables are negatively correlated to each other.
+
+-The average shared net worth for the Bottom 50%, 50-90%, and the Top 1% all differed between 1990s and 2000s.
+
+-Median personal income and median household income increased over time and are positively related to each other.
+
+-The labor force participation rate for women increased over time, while the participation rate of men decreased over time.
+
+-The federal minimum wage also increased as personal and household income increased.
+
+-The distribution of labor force participation rate of women before January 1980 was lower than the overall participation rate.
+
+-The labor force participation rate changed over time in different directions depending on the age group that is looked at.
+
+-Lastly, the average labor force participation rate of those 55 years and older differed between the 1970s and the 1990s.
+
+# Question: What happens to the share of the net worth of the 50-90% as that of the top 1% increases? Is it possible to predict the share of net worth of the 50-90 from the top 1%?
+
+The graph below depicts the relationship of the share of the net worth of the 50-90% as the top 1% increases. On the x-axis is the net worth for the Top 1% and the y-axis is the net worth of the 50-90%. We can see that there is a negative relationship between the Top 1% share of net worth and the 50-90% share. Thus, as the Top 1% share of the nation's net worth increases, the 50-90% share decreases. While the share of net worth has only been reported every quarter from July 1989 to October 2020, there are 126 reported cases which is a large sample size, we can predict what the share of net worth might be for the 50-90% from the Top 1%. We can predict this because in general, when the share of the net worth for the Top 1% is around 32.5, the share of the net worth for the 50-90% is around 27.5. 
+
+```{r net worth}
+fredDataDF %>%
+  filter(!is.na(shareNetWorth50_90), !is.na(shareNetWorthTop1)) %>%
+  ggplot(aes(x = shareNetWorthTop1, y = shareNetWorth50_90)) +
+  geom_point(size = 2) +
+  labs(title = "Share of Net Worth",
+       subtitle = "50-90% Compared to Top 1%",
+       x = "Top 1%", 
+       y = "Middle\n50 to\n90%") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 14),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5))
+```
+
+# Question: Is the average shared Net Worth for the Bottom 50% different in the 1990s versus the 2000s?
+
+In the graph below, we can see that the average share of net worth for the Bottom 50% is different in the 1990s compared to the 2000s. As we can see there was a significant decrease in the the share of net worth for the Bottom 50% from the 1990s to the 2000s. In the 1990s the average share of net worth was 3.70, while in the 2000s the average share of net worth was 2.14.  
+
+```{r bottom50 90s vs 00s}
+bottom50DF <- fredDataDF %>%
+  filter(!is.na(shareNetWorthBott50)) %>%
+  mutate(
+    decade = ifelse(date > as.Date("1989-12-31") & date < as.Date("1999-12-31"), "1990s",
+                  ifelse(date > as.Date("1999-12-31") & date < as.Date("2010-12-31"), "2000s", NA))) %>%
+  group_by(decade) %>%
+  summarise(n = n(),
+            mean = mean(shareNetWorthBott50),
+            sd = sd(shareNetWorthBott50),
+            se = sd / sqrt(n))
+bottom50DF %>%
+  filter(!is.na(decade))%>%
+  ggplot(aes(x = decade, y = mean, group = 1)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = mean - sd,
+                    ymax = mean + sd),
+                width = .1) +
+labs(title = "Shared Net Worth for Bottom 50%",
+     x = "Decade",
+     y = "Average\nNet\nWorth") +
+  theme_minimal(base_size = 16) +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 16),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(angle = 0, size = 14),
+        axis.title.y = element_text(angle = 0, size = 16, face = "bold", vjust = .5),
+        plot.title = element_text(angle = 0, size = 16, vjust = .5))
+```
+
+## Subquestion: What about the middle 50-90%?
+
+We can see, in the graph below, that the average share of net worth for the 50-90% is different in the 1990s compared to the 2000s. As we can see there was a slight decrease in the the share of net worth for the 50-90% from the 1990s to the 2000s. In the 1990s the average share of net worth was 35.26, while in the 2000s the average share of net worth was 33.45. 
+
+```{r Middle50_90 90s vs 00s}
+middle50_90DF <- fredDataDF %>%
+  filter(!is.na(shareNetWorth50_90)) %>%
+  mutate(
+    decade = ifelse(date > as.Date("1989-12-31") & date < as.Date("1999-12-31"), "1990s",
+                  ifelse(date > as.Date("1999-12-31") & date < as.Date("2010-12-31"), "2000s", NA))) %>%
+  group_by(decade) %>%
+  summarise(n = n(),
+            mean = mean(shareNetWorth50_90),
+            sd = sd(shareNetWorth50_90),
+            se = sd / sqrt(n))
+middle50_90DF %>%
+  filter(!is.na(decade))%>%
+  ggplot(aes(x = decade, y = mean, group = 1)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = mean - sd,
+                    ymax = mean + sd),
+                width = .1) +
+labs(title = "Shared Net Worth for Middle 50 to 90%",
+     x = "Decade",
+     y = "Average\nNet\nWorth") +
+  theme_minimal(base_size = 16) +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 16),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(angle = 0, size = 14),
+        axis.title.y = element_text(angle = 0, size = 16, face = "bold", vjust = .5),
+        plot.title = element_text(angle = 0, size = 16, vjust = .5))
+```
+
+## Subquestion: What about the Top 1%?
+
+The graph below visualizes a difference in the average share of total net worth for the Top 1% in the 1990s compared to the 2000s. As we can see there was a slight decrease in the the share of net worth for the Top 1% from the 1990s to the 2000s. In the 1990s the average share of net worth was 26.42, while in the 2000s the average share of net worth was 27.68. 
+
+```{r Top1 90s vs 00s}
+top1DF <- fredDataDF %>%
+  filter(!is.na(shareNetWorthTop1)) %>%
+  mutate(
+    decade = ifelse(date > as.Date("1989-12-31") & date < as.Date("1999-12-31"), "1990s",
+                  ifelse(date > as.Date("1999-12-31") & date < as.Date("2010-12-31"), "2000s", NA))) %>%
+  group_by(decade) %>%
+  summarise(n = n(),
+            mean = mean(shareNetWorthTop1),
+            sd = sd(shareNetWorthTop1),
+            se = sd / sqrt(n))
+middle50_90DF %>%
+  filter(!is.na(decade))%>%
+  ggplot(aes(x = decade, y = mean, group = 1)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = mean - sd,
+                    ymax = mean + sd),
+                width = .1) +
+labs(title = "Shared Net Worth for Top 1%",
+     x = "Decade",
+     y = "Average\nNet\nWorth") +
+  theme_minimal(base_size = 16) +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 16),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(angle = 0, size = 14),
+        axis.title.y = element_text(angle = 0, size = 16, face = "bold", vjust = .5),
+        plot.title = element_text(angle = 0, size = 16, vjust = .5))
+```
+
+# Question: How has the median personal income and the median household income change over time?
+
+The graph below depicts the change of median personal (blue line) and household (red line) income over time from 1974 for Personal income and 1984 for household income to 2019. As we can see both personal and household income increased over time, however personal income was overall lower than household income, which makes sense since household income is the sum of all income in one household. 
+
+```{r median per & house income}
+fredDataDF %>%
+  filter(!is.na(medPersIncome), !is.na(medHouseIncome)) %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = medPersIncome, color = "Personal Income")) +
+  geom_line(aes(y = medHouseIncome, color = "Household Income")) +
+  labs(title = "Median Income Over Time",
+       subtitle = "1974 to 2019",
+       x = "Year", 
+       y = "US\ndollars") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 14),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5)) +
+  scale_color_discrete("Income") +
+  theme(legend.position = "top")
+```
+
+## Subquestion: Do they always vary together? How might we explain divergence or gaps between household income and personal income?
+
+Personal and household income always directly vary together, which is visualized in the graph below. As personal income increases household income increases as well, which makes sense since median household income relies on the personal income of each household member. One possible explanation for this divergence between household and personal income could be household size, which was not reported in this data set. Since household income is made up of the individual income of each member of a household, the size of the household and how many are working will increase the gap between median household and median personal income. 
+
+```{r pers and house vary together}
+fredDataDF %>%
+  filter(!is.na(medPersIncome), !is.na(medHouseIncome)) %>%
+  ggplot(aes(x = medPersIncome, y = medHouseIncome)) +
+  geom_point(size = 2) +
+  labs(x = "Personal Income", y = "Household\n Income") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5))
+```
+
+# Question: How is median personal income related to household income with a focus on federal minimum wage greater than $7.00?
+
+As established in the prior question, median personal and median household income are positively related (personal income increases then household income increases). However, when we highlight all of the federal minimum wage greater than $7 (visualized below), we can see that the highest federal minimum wage reported was $7.25, which were also the highest reported household (greater than $50,000) and personal income (greater than $20,000). This means that as household and personal income increased, federal minimum wage looks to increase as well. 
+
+```{r pers house and fedmin}
+fredDataDF %>%
+  filter(!is.na(medPersIncome), !is.na(medHouseIncome)) %>%
+  ggplot(aes(x = medPersIncome, y = medHouseIncome, colour = fedMinWage, use_group_by=FALSE)) +
+  geom_point() +
+  gghighlight(fedMinWage > 7, label_key = fedMinWage) + # here I am highlighting the data points where the minimum wage is greater than $7
+  labs(x = "Personal Income", y = "Household\n Income") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5))
+```
+
+# Question: What is the distribution of labor force participation overall compared to the overall distribution of labor force participation for women? What is the distribution for both earlier than 1980?
+
+The figure below visualizes the distribution of the total labor force participation rate in the left graph and the distribution of labor force participation rate of women in the right graph. The light gray sections of both graphs is the distribution of labor force participation after January 1980, while the dark gray is the labor force participation before January 1980. The gray dashed line in both graphs indicates the overall average participation rate from 1948 to 2021, while the blue dashed lines indicates the average participation rate before January 1980. When we compare the distributions in both graphs we can see that before January 1980 the participation rate of women was lower than the overall participation rate. We can also see that the average participation rate for women before 1980 is approximately 38, while the overall average participation rate was approximately 59. Lastly, we can see that after January 1980 the participation rate of women increased significantly, but is still less than the overall participation rate; the average overall participation rate is 62.86 while the average participation rate os women is 49.82. We can also see that that entire distribution of participation rate of women is negatively skewed, while the overall participation rate seems to be normally distributed. 
+
+```{r distribution lfprall vs lfprwomen}
+women <- ggplot(fredDataDF, aes(x=lfprWomen)) + 
+  geom_histogram(binwidth=1) +
+  ylim(0, 150) +
+  geom_vline(aes(xintercept=mean(lfprWomen)),
+             color="red", linetype="dashed", size=1) +
+  gghighlight(date < 1980-01-01) +
+  labs(title = "Women",
+       x = "Labor Force\nParticipation Rate",
+       y = "") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5)) +
+  geom_vline(aes(xintercept=mean(lfprWomen)),
+            color="blue", linetype="dashed", size=1) # the mean is 49.82036
+all <- ggplot(fredDataDF, aes(x=lfprAll)) + 
+  geom_histogram(binwidth=1) +
+  ylim(0, 150) +
+  geom_vline(aes(xintercept=mean(lfprAll)),
+            color="red", linetype="dashed", size=1) +
+  gghighlight(date < 1980-01-01) +
+  labs(title = "All",
+       x = "Labor Force\nParticipation Rate",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5)) +
+  geom_vline(aes(xintercept=mean(lfprAll)),
+            color="blue", linetype="dashed", size=1) # the mean is 62.86303
+plot_grid(all, women, labels = "AUTO")
+```
+
+# Question: How has the labor force participation rate of men and women in the United States change over time?
+
+The graph below visualizes change in labor force participation of men (the red line) and women (the blue line) over time, from 1948 to 2021. We can see that there were sharp dips and spikes in participation rate for both genders, but overall women's participation rate increased over time while men's participation rate decreased over time. We can also see a slight decrease of women and men participating in the labor force between 2010 and 2020, with the largest dip between 2020 and 2021, which makes sense due to the COVID-19 pandemic causing a lot of people in the US to lose their jobs. 
+
+```{r lfprmen and women over time}
+ggplot(fredDataDF, aes(x = date)) +
+  geom_line(aes(y = lfprMen, color = "Men")) + #Since we are looking at how both change over time and they are on the same scale, we can plot these two variables into the same graph
+  geom_line(aes(y = lfprWomen, color = "Women")) +
+  labs(title = "Labor Force Participation Rate Over Time",
+       subtitle = "1948 to 2021",
+       x = "Year", 
+       y = "Participation\nRate") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5)) +
+  scale_color_discrete("Gender Identity") +
+  theme(legend.position = "top")
+```
+
+# Question: How has the rate of labor force participation changed over time for each age group?
+
+Visualized in the graph below is the change in labor force participation rate by age group over time (16-19 year group is the red line, 20-24 year group is the green line, 25-54 year group is the blue line, and those over 55 group is the purple line). As we can see each age group, like with what was seen with the two genders, there were sharp dips and spikes, but each group seems to have an overall trend. For the 16-19 year old participation rate seemed to decrease slightly before increasing until 2000, where the participation rate decreased again before leveling out between 2010 and 2020. For the 20-24 year olds, their participation rate  increased over time before decreasing slightly between 2010 and 2020. The 25-54 year group seems to follow a similar trend as the 20-24 year olds, but this age group did not show a decrease in participation until 2020. Lastly, the participation rate of individuals over 55 years old decreased slightly between 1948 and 1970, before significantly decreasing from 1970 to 1990. This age group also increased in participation between 1990 and 2010 before leveling off. 
+
+```{r lfpr by age group}
+ggplot(fredDataDF, aes(x = date)) +
+  geom_line(aes(y = lfpr16_19yrs, color = "16-19yrs")) + 
+  geom_line(aes(y = lfpr20_24yrs, color = "20-24yrs")) +
+  geom_line(aes(y = lfpr25_54yrs, color = "25-54yrs")) +
+  geom_line(aes(y = lfpr55yrsPlus, color = "55yrs\nPlus")) +
+  labs(title = "Labor Force Participation Rate Over Time",
+       subtitle = "1948 to 2021",
+       x = "Year", 
+       y = "Participation\nRate") +
+  theme_minimal() +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 14),
+        axis.text.x = element_text(angle = 0, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(angle = 0, size = 14, face = "bold", vjust = .5)) +
+  scale_color_discrete("Age") +
+  theme(legend.position = "top")
+```
+
+# Question: Is the average labor force participation rate of people over the age of 55 different in the 1970s versus the 1990s?
+
+In this last graph below I have visualized the average participation rate of individuals over 55 years old in the 1970s and 1990s. We can see that on average individuals over 55 years old had a higher participation rate in the 1970s compared to their participation rate in the 1990s. Their average participation rate was 35.50 in the 1970s while their average participation rate was 30.31 in the 1990s.
+
+```{r lfpr55 70s vs 90s}
+lfpr55DF <- fredDataDF %>%
+  mutate(
+    decade = ifelse(date > as.Date("1969-12-31") & date < as.Date("1979-12-31"), "1970s",
+                  ifelse(date > as.Date("1989-12-31") & date < as.Date("1999-12-31"), "1990s", NA))) %>%
+  group_by(decade) %>%
+  summarise(n = n(),
+            mean = mean(lfpr55yrsPlus),
+            sd = sd(lfpr55yrsPlus),
+            se = sd / sqrt(n))
+lfpr55DF %>%
+  filter(!is.na(decade))%>%
+  ggplot(aes(x = decade, y = mean, group = 1)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = mean - sd,
+                    ymax = mean + sd),
+                width = .1) +
+labs(title = "Average Labor Force\nParticipation Rate\nOver 55 Years",
+     x = "Decade",
+     y = "Average\nParticipation\nRate") +
+  theme_minimal(base_size = 16) +
+  theme(axis.title.x = element_text(face = "bold", color = "#000000", size = 16),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(angle = 0, size = 14),
+        axis.title.y = element_text(angle = 0, size = 16, face = "bold", vjust = .5),
+        plot.title = element_text(angle = 0, size = 16, vjust = .5))
+```
+
+# Conclusion
+
+The sample size for this data set is fairly large and represents different economic variables between 1948 and 2021. Due to the longitudinal style of this data set and the amount of data that was able to be collected the results are likely stable. From this we can predict that median personal income and median household income is positively related to each other and they both increased over time. We can also conclude that the share of net worth of the Top 1% can most likely predict the share of the 50-90% because the two variables are negatively correlated to each other. We can also see that the labor force participation rate for women increased over time, while the participation rate of men decreased over time. 
